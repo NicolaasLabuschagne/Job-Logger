@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Logger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600;700&family=Roboto+Slab:wght@400;500;700&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.14.0/html2pdf.bundle.min.js"></script>
+<style>
+  :root{
+    --bg:#04070a;
+    --panel:#070c0d; --panel-head:#0d1517;
+    --border:rgba(206,247,255,.55); --border-dim:rgba(206,247,255,.22);
+    --text:#cdf5ff; --muted:#6d8b8f;
+    --amber:#d9a441; --success:#8fe3a6; --danger:#e0716a;
+    --input-bg:#020608; --input-border:rgba(206,247,255,.3);
+    --focus-ring:rgba(206,247,255,.2);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;font-family:'IBM Plex Mono',monospace;
+    color:var(--text);min-height:100vh;background:var(--bg);
+    position:relative;
+  }
+  /* CRT scanlines + vignette overlay, fixed above all content */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:9999;pointer-events:none;
+    background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) 1px, rgba(0,0,0,.32) 2px, rgba(0,0,0,0) 3px);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:9998;pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.6) 100%);
+  }
+  h1,h2{font-family:'VT323',monospace;font-weight:400;}
+
+  header{
+    background:var(--panel);border:1px solid var(--border);border-radius:0;
+    padding:0;display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+    position:sticky;top:14px;z-index:10;max-width:1180px;margin:14px auto 0;
+  }
+  header h1{font-size:22px;font-weight:400;margin:0;padding:10px 18px;white-space:nowrap;color:var(--text);letter-spacing:.04em;display:flex;align-items:center;gap:10px;border-right:1px solid var(--border-dim);text-shadow:0 0 6px rgba(205,245,255,.5);}
+  header h1 i{color:var(--text);font-size:15px;}
+  nav{display:flex;gap:2px;flex-wrap:wrap;padding:0 10px;}
+  nav button{background:none;border:none;border-bottom:2px solid transparent;padding:12px 12px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);transition:all .15s;}
+  nav button:hover{color:var(--text);}
+  nav button.active{color:var(--text);border-bottom-color:var(--text);text-shadow:0 0 6px rgba(205,245,255,.5);}
+  main{max-width:1180px;margin:0 auto;padding:26px 20px 60px;}
+  .tab{display:none;}
+  .tab.active{display:block;}
+  .panel{background:var(--panel);border:1px solid var(--border-dim);border-radius:0;padding:20px 22px;margin-bottom:20px;}
+  .panel h2{
+    margin:-20px -22px 18px;padding:9px 22px;font-size:16px;font-weight:400;
+    color:var(--text);text-transform:uppercase;letter-spacing:.08em;
+    background:var(--panel-head);border-bottom:1px solid var(--border-dim);
+    text-shadow:0 0 5px rgba(205,245,255,.4);
+  }
+  .panel h2::after{content:"■ ■ ■";float:right;font-size:9px;letter-spacing:3px;color:var(--muted);opacity:.5;}
+  .grid{display:grid;gap:12px;}
+  .grid.cols-2{grid-template-columns:1fr 1fr;}
+  .grid.cols-3{grid-template-columns:1fr 1fr 1fr;}
+  .grid.cols-4{grid-template-columns:1fr 1fr 1fr 1fr;}
+  @media(max-width:700px){.grid.cols-2,.grid.cols-3,.grid.cols-4{grid-template-columns:1fr;}}
+  label{display:block;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+  input,select,textarea{width:100%;padding:9px 11px;border:1px solid var(--input-border);border-radius:0;font-size:14px;font-family:'IBM Plex Mono',monospace;background:var(--input-bg);color:var(--text);transition:border-color .15s,box-shadow .15s;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--text);box-shadow:0 0 0 2px var(--focus-ring);}
+  textarea{resize:vertical;min-height:60px;}
+  .field{margin-bottom:2px;}
+  .row-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;}
+  button.btn{cursor:pointer;border:1px solid var(--text);border-radius:0;padding:9px 18px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:transparent;color:var(--text);transition:all .15s;}
+  button.btn:hover{background:var(--text);color:#03080a;}
+  button.btn:active{transform:scale(.97);}
+  button.btn:disabled{opacity:.35;cursor:default;transform:none;background:transparent;color:var(--text);}
+  button.btn.secondary{border-color:var(--border-dim);color:var(--muted);}
+  button.btn.secondary:hover{background:rgba(205,245,255,.1);color:var(--text);}
+  button.btn.danger{border-color:var(--danger);color:var(--danger);}
+  button.btn.danger:hover{background:var(--danger);color:#1a0000;}
+  button.btn.sm{padding:6px 12px;font-size:10.5px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:10px;text-align:left;border-bottom:1px solid var(--border-dim);vertical-align:top;}
+  th{font-weight:600;color:var(--text);font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom-color:var(--border);}
+  tr:last-child td{border-bottom:none;}
+  tbody tr:hover td{background:rgba(205,245,255,.05);}
+  .badge{display:inline-block;padding:3px 9px;border-radius:0;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;background:transparent;border:1px solid currentColor;}
+  .badge.unbilled{color:var(--amber);}
+  .badge.billed{color:var(--text);}
+  .badge.paid{color:var(--success);}
+  .badge.unpaid{color:var(--danger);}
+  .muted{color:var(--muted);}
+  .summary-bar{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;}
+  .summary-card{background:var(--panel);border:1px solid var(--border-dim);padding:14px 20px;min-width:150px;}
+  .summary-card .num{font-family:'VT323',monospace;font-size:28px;color:var(--text);text-shadow:0 0 6px rgba(205,245,255,.5);}
+  .summary-card:nth-child(2n) .num{color:var(--success);}
+  .summary-card:nth-child(3n) .num{color:var(--amber);}
+  .summary-card .lbl{font-size:10.5px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+  .empty{color:var(--muted);font-size:13px;padding:16px 0;text-align:center;}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
+  .toolbar .field{min-width:150px;flex:1;}
+  .checkbox-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border-dim);}
+  .checkbox-row:last-child{border-bottom:none;}
+  .checkbox-row input[type=checkbox]{width:auto;accent-color:var(--text);}
+  .lock{color:var(--muted);font-size:12px;}
+  .hidden{display:none!important;}
+
+  /* Auth */
+  .auth-area{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12px;white-space:nowrap;padding-right:16px;}
+  .auth-live{font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--success);border:1px solid var(--success);padding:5px 10px;}
+  .auth-demo{font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--amber);border:1px solid var(--amber);padding:5px 10px;}
+  .demo-banner{background:#0a0704;border-bottom:1px solid var(--amber);color:var(--amber);padding:10px 24px;font-size:12.5px;font-weight:500;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;gap:12px;justify-content:center;flex-wrap:wrap;text-align:center;}
+  .demo-banner strong{font-weight:700;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,3,4,.85);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:0;width:340px;max-width:100%;box-shadow:0 0 30px rgba(0,0,0,.6);overflow:hidden;}
+  .modal-body{padding:24px;}
+  .modal h2{margin:-24px -24px 18px;padding:9px 24px;font-size:16px;font-weight:400;color:var(--text);text-transform:uppercase;letter-spacing:.08em;background:var(--panel-head);border-bottom:1px solid var(--border-dim);}
+  .modal h2::after{content:"■ ■ ■";float:right;font-size:9px;letter-spacing:3px;color:var(--muted);opacity:.5;}
+  .error-text{color:var(--danger);font-size:12.5px;margin-top:8px;}
+
+  /* Document preview (invoice / job log) styling, shared with print/pdf.
+     Deliberately separate from the app's brutalist chrome above — these are
+     client-facing paperwork, styled after the original spreadsheet invoice
+     (Rockwell Nova + Century Gothic, charcoal header row, cream row stripes). */
+  #docPreviewWrap{margin-top:10px;}
+  .doc{
+    --doc-ink:#26241f; --doc-muted:#8a8578; --doc-line:#e6e1d3; --doc-cream:#f7f3e8; --doc-dark:#26241f;
+    background:#fffefb;padding:52px 56px;border:1px solid var(--doc-line);border-radius:6px;
+    color:var(--doc-ink);font-size:13px;font-family:'Jost',sans-serif;line-height:1.6;
+    position:relative;z-index:10000; /* sit above the CRT scanline/vignette overlay so the printed doc stays clean */
+  }
+  .doc h1.doc-title{font-family:'Roboto Slab',serif;font-size:30px;font-weight:700;letter-spacing:.06em;margin:0 0 16px;text-align:right;color:var(--doc-dark);}
+  .doc-columns{display:grid;grid-template-columns:1.15fr 1fr;gap:40px;padding-bottom:24px;margin-bottom:26px;border-bottom:2px solid var(--doc-dark);}
+  .doc-header{padding-bottom:22px;margin-bottom:24px;border-bottom:2px solid var(--doc-dark);}
+  .doc-sender-banner{background:var(--doc-dark);display:inline-block;padding:10px 16px;margin-bottom:14px;}
+  .doc-sender-name{font-family:'Roboto Slab',serif;font-size:19px;font-weight:700;margin:0 0 3px;color:var(--doc-cream);}
+  .doc-sender-tagline{color:var(--doc-cream);opacity:.8;margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:500;}
+  .doc-sender-addr{color:var(--doc-muted);line-height:1.6;font-size:12.5px;}
+  .doc-meta-block{font-size:12.5px;margin-bottom:28px;}
+  .doc-meta-block p{margin:3px 0;}
+  .doc-meta-block .k{color:var(--doc-muted);font-weight:500;text-transform:uppercase;font-size:10px;letter-spacing:.1em;display:inline-block;min-width:70px;}
+  .doc-block-gap{margin-top:28px;font-size:12.5px;}
+  .doc-block-gap p{margin:3px 0;}
+  .doc-label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--doc-muted);margin:0 0 8px;}
+  table.doc-table{width:100%;border-collapse:collapse;margin-top:4px;}
+  table.doc-table th{background:var(--doc-dark);color:var(--doc-cream);padding:11px 14px;font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;text-align:left;}
+  table.doc-table td{padding:10px 14px;border-bottom:1px solid var(--doc-line);}
+  table.doc-table tbody tr:nth-child(even) td{background:var(--doc-cream);}
+  table.doc-table .num{text-align:right;}
+  table.doc-table tr.total-row td{font-family:'Roboto Slab',serif;font-weight:700;font-size:14px;border-top:none;border-bottom:none;background:var(--doc-dark)!important;color:var(--doc-cream);padding-top:13px;padding-bottom:13px;}
+  .doc-thanks{margin-top:34px;padding-top:18px;border-top:1px solid var(--doc-line);text-align:center;color:var(--doc-muted);font-size:11px;text-transform:uppercase;letter-spacing:.1em;}
+  @media print{
+    header,nav,.demo-banner,.no-print{display:none!important;}
+    body{background:#fff;}
+    main{max-width:none;padding:0;margin:0;}
+    .panel{border:none;box-shadow:none;padding:0;}
+    .doc{border:none;padding:0;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><i class="fa fa-terminal"></i> Job Logger</h1>
+  <nav>
+    <button data-tab="log" class="active">Time Log</button>
+    <button data-tab="invoices">Invoices</button>
+    <button data-tab="joblog">Job Log</button>
+    <button data-tab="clients">Clients</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+  <div class="auth-area" id="authArea"></div>
+</header>
+
+<div class="demo-banner hidden" id="demoBanner">
+  <i class="fa fa-flask"></i> <strong>Demo Mode</strong> — you're viewing completely fabricated sample data. Every button works, but nothing here is saved or connected to the real account.
+  <button class="btn sm" id="demoBannerSignIn">Sign In</button>
+</div>
+
+<main>
+
+  <!-- TIME LOG TAB -->
+  <div class="tab active" id="tab-log">
+    <div class="summary-bar" id="logSummary"></div>
+
+    <div class="panel">
+      <h2><span id="entryFormTitle">Add Time Entry</span> <span id="entryDateLabel" class="muted" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:12px;"></span></h2>
+      <form id="entryForm">
+        <div class="grid cols-3">
+          <div class="field"><label>Client</label><select id="entryClient" required></select></div>
+          <div class="field"><label>Start Time</label><input type="time" id="entryStart" required></div>
+          <div class="field"><label>End Time</label><input type="time" id="entryEnd" required></div>
+        </div>
+        <div class="grid cols-3" style="margin-top:12px;">
+          <div class="field"><label>Category</label>
+            <select id="entryCategory">
+              <option>Coding</option>
+              <option>Meeting</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field" style="grid-column:span 2;"><label>Short description</label><input type="text" id="entryDesc" placeholder="e.g. Debugging and coding" required></div>
+        </div>
+        <div class="row-actions">
+          <button type="submit" class="btn" id="entrySubmitBtn">Add Entry</button>
+          <button type="button" class="btn secondary hidden" id="entryCancelBtn">Cancel Edit</button>
+          <span class="muted" id="entryHoursPreview" style="align-self:center;"></span>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="toolbar">
+        <div class="field"><label>Client</label><select id="filterClient"><option value="">All clients</option></select></div>
+        <div class="field"><label>Status</label>
+          <select id="filterStatus">
+            <option value="">All</option>
+            <option value="unbilled">Unbilled</option>
+            <option value="billed">Billed</option>
+          </select>
+        </div>
+        <div class="field"><label>From</label><input type="date" id="filterFrom"></div>
+        <div class="field"><label>To</label><input type="date" id="filterTo"></div>
+      </div>
+      <div id="entryTableWrap"></div>
+    </div>
+  </div>
+
+  <!-- INVOICES TAB -->
+  <div class="tab" id="tab-invoices">
+    <div class="panel">
+      <h2>Create Invoice</h2>
+      <div class="grid cols-4">
+        <div class="field"><label>Client</label><select id="invClient"></select></div>
+        <div class="field"><label>Invoice #</label><input type="text" id="invNumber"></div>
+        <div class="field"><label>Invoice Date</label><input type="date" id="invDate"></div>
+        <div class="field"><label>Rate (per hour)</label><input type="number" step="0.01" id="invRate"></div>
+      </div>
+      <div class="grid cols-2" style="margin-top:12px;">
+        <div class="field"><label>Description (the one line shown on the invoice)</label><input type="text" id="invDescription" placeholder="Software Services"></div>
+      </div>
+      <div id="invEntryPicker" style="margin-top:14px;"></div>
+      <div class="row-actions">
+        <span id="invTotals" class="muted"></span>
+      </div>
+      <div class="row-actions">
+        <button class="btn" id="generateInvoiceBtn">Generate Invoice</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Past Invoices</h2>
+      <div id="invoiceListWrap"></div>
+    </div>
+
+    <div class="panel hidden" id="invoicePreviewPanel">
+      <div class="row-actions no-print">
+        <button class="btn secondary" id="closeInvoicePreview">Close</button>
+        <button class="btn" id="exportInvoicePdf">Export PDF</button>
+        <button class="btn secondary" id="printInvoice">Print</button>
+      </div>
+      <div id="docPreviewWrap"></div>
+    </div>
+  </div>
+
+  <!-- JOB LOG TAB -->
+  <div class="tab" id="tab-joblog">
+    <div class="panel">
+      <h2>Generate Job Log</h2>
+      <div class="grid cols-4">
+        <div class="field"><label>Client</label><select id="jlClient"><option value="">All clients</option></select></div>
+        <div class="field"><label>Invoice</label><select id="jlInvoice"><option value="">All entries</option><option value="unbilled">Unbilled only</option></select></div>
+        <div class="field"><label>From</label><input type="date" id="jlFrom"></div>
+        <div class="field"><label>To</label><input type="date" id="jlTo"></div>
+      </div>
+      <div class="row-actions">
+        <button class="btn" id="generateJobLogBtn">Generate</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="jobLogPreviewPanel">
+      <div class="row-actions no-print">
+        <button class="btn secondary" id="closeJobLogPreview">Close</button>
+        <button class="btn" id="exportJobLogPdf">Export PDF</button>
+        <button class="btn secondary" id="printJobLog">Print</button>
+      </div>
+      <div id="jobLogPreviewWrap"></div>
+    </div>
+  </div>
+
+  <!-- CLIENTS TAB -->
+  <div class="tab" id="tab-clients">
+    <div class="panel">
+      <h2 id="clientFormTitle">Add Client</h2>
+      <form id="clientForm">
+        <div class="grid cols-2">
+          <div class="field"><label>Client / Company name</label><input type="text" id="clName" required></div>
+          <div class="field"><label>Contact person</label><input type="text" id="clContact"></div>
+        </div>
+        <div class="grid cols-2" style="margin-top:12px;">
+          <div class="field"><label>Address (one line each)</label><textarea id="clAddress" placeholder="70 Umvumvu Drive&#10;Umhlali, 4399, South Africa"></textarea></div>
+          <div class="grid cols-2" style="align-content:start;">
+            <div class="field"><label>Phone</label><input type="text" id="clPhone"></div>
+            <div class="field"><label>Currency symbol</label><input type="text" id="clCurrency" value="R"></div>
+            <div class="field"><label>Hourly rate</label><input type="number" step="0.01" id="clRate"></div>
+          </div>
+        </div>
+        <div class="row-actions">
+          <button type="submit" class="btn" id="clientSubmitBtn">Add Client</button>
+          <button type="button" class="btn secondary hidden" id="clientCancelBtn">Cancel Edit</button>
+        </div>
+      </form>
+    </div>
+    <div class="panel">
+      <h2>Clients</h2>
+      <div id="clientListWrap"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="tab" id="tab-settings">
+    <div class="panel">
+      <h2>Your Details (Invoice Sender)</h2>
+      <form id="senderForm">
+        <div class="grid cols-2">
+          <div class="field"><label>Your name / business name</label><input type="text" id="sName"></div>
+          <div class="field"><label>Tagline / role</label><input type="text" id="sTagline"></div>
+        </div>
+        <div class="grid cols-2" style="margin-top:12px;">
+          <div class="field"><label>Address (one line each)</label><textarea id="sAddress"></textarea></div>
+          <div class="grid cols-2" style="align-content:start;">
+            <div class="field"><label>Phone</label><input type="text" id="sPhone"></div>
+            <div class="field"><label>Email</label><input type="text" id="sEmail"></div>
+          </div>
+        </div>
+        <h2 style="margin-top:20px;">Payment Info (shown on invoices)</h2>
+        <div class="grid cols-2">
+          <div class="field"><label>Bank name</label><input type="text" id="bBankName"></div>
+          <div class="field"><label>Branch name</label><input type="text" id="bBranchName"></div>
+          <div class="field"><label>Branch code</label><input type="text" id="bBranchCode"></div>
+          <div class="field"><label>Account holder</label><input type="text" id="bAccountHolder"></div>
+          <div class="field"><label>Account number</label><input type="text" id="bAccountNumber"></div>
+          <div class="field"><label>Account type</label><input type="text" id="bAccountType"></div>
+          <div class="field"><label>SWIFT code</label><input type="text" id="bSwift"></div>
+        </div>
+        <div class="row-actions">
+          <button type="submit" class="btn">Save Settings</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel hidden" id="changePasswordPanel">
+      <h2>Change Password</h2>
+      <p class="muted" id="changePasswordNote" style="margin-top:0;"></p>
+      <form id="changePasswordForm">
+        <div class="grid cols-2">
+          <div class="field"><label>New password</label><input type="password" id="newPassword" autocomplete="new-password" minlength="6" required></div>
+          <div class="field"><label>Confirm new password</label><input type="password" id="newPasswordConfirm" autocomplete="new-password" minlength="6" required></div>
+        </div>
+        <div class="error-text hidden" id="changePasswordError"></div>
+        <div class="row-actions">
+          <button type="submit" class="btn">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</main>
+
+<!-- LOGIN MODAL -->
+<div class="modal-overlay hidden" id="loginModalOverlay">
+  <div class="modal">
+    <div class="modal-body">
+      <h2>Sign In</h2>
+      <form id="loginForm">
+        <div class="field"><label>Email</label><input type="email" id="loginEmail" autocomplete="username" required></div>
+        <div class="field" style="margin-top:10px;"><label>Password</label><input type="password" id="loginPassword" autocomplete="current-password" required></div>
+        <div class="error-text hidden" id="loginError"></div>
+        <div class="row-actions">
+          <button type="submit" class="btn">Sign In</button>
+          <button type="button" class="btn secondary" id="loginCancelBtn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+  const SUPABASE_URL = "https://vlwuhplkctevwoaicrcb.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZsd3VocGxrY3RldndvYWljcmNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzOTQyOTIsImV4cCI6MjEwMzk3MDI5Mn0.TIs5xIdgiIr1_ihl0BubSV7q4ZEEplrivs9NxQPGnQQ";
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let mode = "demo"; // "demo" | "live" — demo never touches Supabase data tables
+  let currentUser = null;
+  let state = { sender: emptySender(), clients: [], entries: [], invoices: [], nextInvoiceNumber: 1 };
+
+  function uid(){
+    return (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
+  }
+  function escapeHtml(str){
+    return String(str==null?"":str).replace(/[&<>"']/g, s => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[s]));
+  }
+  function fmtMoney(n, symbol){
+    n = Number(n)||0;
+    return symbol + " " + n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  function fmtHours(n){
+    return (Number(n)||0).toFixed(2);
+  }
+  function todayStr(){
+    const d = new Date();
+    return d.toISOString().slice(0,10);
+  }
+  function dayName(dateStr){
+    const d = new Date(dateStr+"T00:00:00");
+    return d.toLocaleDateString(undefined,{weekday:"long"});
+  }
+  function fmtDateDisplay(dateStr){
+    const d = new Date(dateStr+"T00:00:00");
+    return d.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"});
+  }
+  function calcHours(start, end){
+    const [sh,sm] = start.split(":").map(Number);
+    const [eh,em] = end.split(":").map(Number);
+    let startMin = sh*60+sm, endMin = eh*60+em;
+    if(endMin <= startMin) endMin += 24*60; // overnight session
+    return (endMin-startMin)/60;
+  }
+
+  function emptySender(){
+    return {
+      name:"", tagline:"", addressLines:[], phone:"", email:"",
+      bank:{bankName:"",branchName:"",branchCode:"",accountHolder:"",accountNumber:"",accountType:"",swift:""}
+    };
+  }
+
+  // ---------- Fabricated demo dataset (never touches Supabase) ----------
+  function generateDemoData(){
+    const c1 = uid(), c2 = uid();
+    const clients = [
+      {id:c1, name:"Acme Widgets Ltd", contactPerson:"Jordan Blake", addressLines:["400 Market Street","Springfield, IL 62704"], phone:"555-0134", currency:"$", rate:85},
+      {id:c2, name:"Northwind Traders", contactPerson:"Sam Rivera", addressLines:["12 Harbor Rd","Portland, OR 97201"], phone:"555-0198", currency:"$", rate:95}
+    ];
+    const descriptions = ["Bug fixes","Client meeting","Feature development","Code review","Deployment and testing","Planning session","Refactoring"];
+    const categories = ["Coding","Meeting","Other"];
+    const entries = [];
+    const today = new Date();
+    for(let i=0;i<18;i++){
+      const d = new Date(today); d.setDate(d.getDate() - (i*2 + 1));
+      const dateStr = d.toISOString().slice(0,10);
+      const clientId = i%3===0 ? c2 : c1;
+      const startH = 8 + (i%5), startM = (i*7)%60;
+      const durMin = (1 + (i%4)*0.5)*60;
+      const endTotal = startH*60+startM + durMin;
+      const endH = Math.floor(endTotal/60)%24, endM = Math.round(endTotal%60);
+      entries.push({
+        id: uid(), clientId,
+        date: dateStr,
+        startTime: `${String(startH).padStart(2,"0")}:${String(startM).padStart(2,"0")}`,
+        endTime: `${String(endH).padStart(2,"0")}:${String(endM).padStart(2,"0")}`,
+        category: categories[i%categories.length],
+        description: descriptions[i%descriptions.length],
+        invoiceId: null
+      });
+    }
+    const invoiceId = uid();
+    const c1Entries = entries.filter(e=>e.clientId===c1).slice(-4);
+    c1Entries.forEach(e=>e.invoiceId=invoiceId);
+    const invoices = [{
+      id: invoiceId, clientId: c1, number: "DEMO-1",
+      date: c1Entries.length ? c1Entries[c1Entries.length-1].date : todayStr(),
+      rate: 85, currency: "$", status: "paid"
+    }];
+    return {
+      sender: {
+        name: "Alex Rivera",
+        tagline: "Freelance Software Consulting",
+        addressLines: ["Sample City, ST"],
+        phone: "555-0100",
+        email: "alex@example.com",
+        bank: {bankName:"Example Bank", branchName:"Main Branch", branchCode:"000000", accountHolder:"ALEX RIVERA", accountNumber:"0000 0000 0000", accountType:"CHECKING", swift:"EXAMPUS33"}
+      },
+      clients, entries, invoices, nextInvoiceNumber: 2
+    };
+  }
+
+  // ---------- Row <-> app-state mapping (Supabase uses snake_case) ----------
+  function rowToClient(r){ return {id:r.id, name:r.name, contactPerson:r.contact_person||"", addressLines:r.address_lines||[], phone:r.phone||"", currency:r.currency||"R", rate:Number(r.rate)||0}; }
+  function rowToEntry(r){ return {id:r.id, clientId:r.client_id, invoiceId:r.invoice_id, date:r.date, startTime:(r.start_time||"").slice(0,5), endTime:(r.end_time||"").slice(0,5), category:r.category, description:r.description||""}; }
+  function rowToInvoice(r){ return {id:r.id, clientId:r.client_id, number:r.number, date:r.date, rate:Number(r.rate)||0, currency:r.currency||"R", status:r.status, description:r.description||"Software Services"}; }
+  function rowToSender(r){ return {name:r.name||"", tagline:r.tagline||"", addressLines:r.address_lines||[], phone:r.phone||"", email:r.email||"", bank:r.bank||{}}; }
+
+  async function loadLiveData(){
+    const [clientsRes, entriesRes, invoicesRes, settingsRes] = await Promise.all([
+      supabase.from("clients").select("*").order("name"),
+      supabase.from("entries").select("*").order("date",{ascending:false}),
+      supabase.from("invoices").select("*").order("date",{ascending:false}),
+      supabase.from("settings").select("*").maybeSingle()
+    ]);
+    const firstError = clientsRes.error || entriesRes.error || invoicesRes.error || settingsRes.error;
+    if(firstError){
+      console.error(firstError);
+      alert("Could not load your data from Supabase: " + firstError.message);
+    }
+    state.clients = (clientsRes.data||[]).map(rowToClient);
+    state.entries = (entriesRes.data||[]).map(rowToEntry);
+    state.invoices = (invoicesRes.data||[]).map(rowToInvoice);
+    state.sender = settingsRes.data ? rowToSender(settingsRes.data) : emptySender();
+    state.nextInvoiceNumber = settingsRes.data?.next_invoice_number || 1;
+  }
+
+  // ---------- Data access layer: branches on live Supabase vs in-memory demo ----------
+  const Data = {
+    async loadAll(){
+      if(mode==="live") await loadLiveData();
+      else state = generateDemoData();
+    },
+    async createEntry(payload){
+      if(mode==="live"){
+        const { data, error } = await supabase.from("entries").insert({
+          user_id: currentUser.id, client_id: payload.clientId, date: payload.date,
+          start_time: payload.startTime, end_time: payload.endTime,
+          category: payload.category, description: payload.description
+        }).select().single();
+        if(error) throw error;
+        state.entries.push(rowToEntry(data));
+      } else {
+        state.entries.push({id:uid(), invoiceId:null, ...payload});
+      }
+    },
+    async updateEntry(id, payload){
+      if(mode==="live"){
+        const { data, error } = await supabase.from("entries").update({
+          client_id: payload.clientId, date: payload.date,
+          start_time: payload.startTime, end_time: payload.endTime,
+          category: payload.category, description: payload.description
+        }).eq("id", id).select().single();
+        if(error) throw error;
+        const idx = state.entries.findIndex(e=>e.id===id);
+        state.entries[idx] = rowToEntry(data);
+      } else {
+        Object.assign(state.entries.find(e=>e.id===id), payload);
+      }
+    },
+    async deleteEntry(id){
+      if(mode==="live"){
+        const { error } = await supabase.from("entries").delete().eq("id", id);
+        if(error) throw error;
+      }
+      state.entries = state.entries.filter(e=>e.id!==id);
+    },
+    async createClient(payload){
+      if(mode==="live"){
+        const { data, error } = await supabase.from("clients").insert({
+          user_id: currentUser.id, name: payload.name, contact_person: payload.contactPerson,
+          address_lines: payload.addressLines, phone: payload.phone, currency: payload.currency, rate: payload.rate
+        }).select().single();
+        if(error) throw error;
+        state.clients.push(rowToClient(data));
+      } else {
+        state.clients.push({id:uid(), ...payload});
+      }
+    },
+    async updateClient(id, payload){
+      if(mode==="live"){
+        const { data, error } = await supabase.from("clients").update({
+          name: payload.name, contact_person: payload.contactPerson,
+          address_lines: payload.addressLines, phone: payload.phone, currency: payload.currency, rate: payload.rate
+        }).eq("id", id).select().single();
+        if(error) throw error;
+        const idx = state.clients.findIndex(c=>c.id===id);
+        state.clients[idx] = rowToClient(data);
+      } else {
+        Object.assign(state.clients.find(c=>c.id===id), payload);
+      }
+    },
+    async deleteClient(id){
+      if(mode==="live"){
+        const { error } = await supabase.from("clients").delete().eq("id", id);
+        if(error) throw error;
+      }
+      state.clients = state.clients.filter(c=>c.id!==id);
+    },
+    async saveSender(sender){
+      if(mode==="live"){
+        const { data, error } = await supabase.from("settings").upsert({
+          user_id: currentUser.id, name: sender.name, tagline: sender.tagline,
+          address_lines: sender.addressLines, phone: sender.phone, email: sender.email, bank: sender.bank
+        }, {onConflict:"user_id"}).select().single();
+        if(error) throw error;
+        state.sender = rowToSender(data);
+      } else {
+        state.sender = sender;
+      }
+    },
+    async createInvoice({clientId, number, date, rate, currency, description, entryIds}){
+      let invoice;
+      const nextNum = Math.max((parseInt(number)||0)+1, (state.nextInvoiceNumber||1)+1);
+      if(mode==="live"){
+        const { data, error } = await supabase.from("invoices").insert({
+          user_id: currentUser.id, client_id: clientId, number, date, rate, currency, description, status:"unpaid"
+        }).select().single();
+        if(error) throw error;
+        invoice = rowToInvoice(data);
+        const { error: updErr } = await supabase.from("entries").update({invoice_id: invoice.id}).in("id", entryIds);
+        if(updErr) throw updErr;
+        await supabase.from("settings").upsert({user_id: currentUser.id, next_invoice_number: nextNum}, {onConflict:"user_id"});
+      } else {
+        invoice = {id:uid(), clientId, number, date, rate, currency, description, status:"unpaid"};
+      }
+      state.nextInvoiceNumber = nextNum;
+      state.invoices.push(invoice);
+      entryIds.forEach(id=>{
+        const entry = state.entries.find(e=>e.id===id);
+        if(entry) entry.invoiceId = invoice.id;
+      });
+      return invoice;
+    },
+    async setInvoiceStatus(id, status){
+      if(mode==="live"){
+        const { error } = await supabase.from("invoices").update({status}).eq("id", id);
+        if(error) throw error;
+      }
+      getInvoice(id).status = status;
+    },
+    async deleteInvoice(id){
+      if(mode==="live"){
+        const { error: updErr } = await supabase.from("entries").update({invoice_id:null}).eq("invoice_id", id);
+        if(updErr) throw updErr;
+        const { error } = await supabase.from("invoices").delete().eq("id", id);
+        if(error) throw error;
+      }
+      state.entries.forEach(e=>{ if(e.invoiceId===id) e.invoiceId=null; });
+      state.invoices = state.invoices.filter(i=>i.id!==id);
+    }
+  };
+
+  function getClient(id){ return state.clients.find(c=>c.id===id); }
+  function getInvoice(id){ return state.invoices.find(i=>i.id===id); }
+
+  // ---------- Auth ----------
+  function renderAuthUI(){
+    const area = document.getElementById("authArea");
+    const banner = document.getElementById("demoBanner");
+    if(mode==="live"){
+      banner.classList.add("hidden");
+      area.innerHTML = `<span class="auth-live"><i class="fa fa-check-circle"></i> ${escapeHtml(currentUser.email)}</span> <button class="btn secondary sm" id="signOutBtn">Sign Out</button>`;
+      document.getElementById("signOutBtn").addEventListener("click", async ()=>{ await supabase.auth.signOut(); });
+    } else {
+      banner.classList.remove("hidden");
+      area.innerHTML = `<span class="auth-demo"><i class="fa fa-flask"></i> Demo Mode</span> <button class="btn sm" id="signInBtn">Sign In</button>`;
+      document.getElementById("signInBtn").addEventListener("click", openLoginModal);
+    }
+    document.getElementById("changePasswordPanel").classList.toggle("hidden", mode!=="live");
+  }
+  function showPasswordRecoveryPrompt(){
+    document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    document.querySelector('nav button[data-tab="settings"]').classList.add("active");
+    document.getElementById("tab-settings").classList.add("active");
+    renderSettings();
+    document.getElementById("changePasswordNote").textContent = "You followed a password reset link — enter your new password below to finish.";
+    document.getElementById("newPassword").focus();
+  }
+  document.getElementById("changePasswordForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const pw1 = document.getElementById("newPassword").value;
+    const pw2 = document.getElementById("newPasswordConfirm").value;
+    const errEl = document.getElementById("changePasswordError");
+    errEl.classList.add("hidden");
+    if(pw1 !== pw2){
+      errEl.textContent = "Passwords don't match.";
+      errEl.classList.remove("hidden");
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password: pw1 });
+    if(error){
+      errEl.textContent = error.message;
+      errEl.classList.remove("hidden");
+      return;
+    }
+    document.getElementById("changePasswordForm").reset();
+    document.getElementById("changePasswordNote").textContent = "Password updated.";
+  });
+  function openLoginModal(){
+    document.getElementById("loginError").classList.add("hidden");
+    document.getElementById("loginForm").reset();
+    document.getElementById("loginModalOverlay").classList.remove("hidden");
+    document.getElementById("loginEmail").focus();
+  }
+  function closeLoginModal(){
+    document.getElementById("loginModalOverlay").classList.add("hidden");
+  }
+  document.getElementById("demoBannerSignIn").addEventListener("click", openLoginModal);
+  document.getElementById("loginCancelBtn").addEventListener("click", closeLoginModal);
+  document.getElementById("loginModalOverlay").addEventListener("click", e=>{
+    if(e.target.id==="loginModalOverlay") closeLoginModal();
+  });
+  document.getElementById("loginForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    const errEl = document.getElementById("loginError");
+    errEl.classList.add("hidden");
+    const { error } = await supabase.auth.signInWithPassword({email, password});
+    if(error){
+      errEl.textContent = error.message;
+      errEl.classList.remove("hidden");
+      return;
+    }
+    closeLoginModal();
+  });
+
+  function applySession(session){
+    mode = session ? "live" : "demo";
+    currentUser = session ? session.user : null;
+  }
+  function renderCurrentTab(){
+    const activeBtn = document.querySelector("nav button.active");
+    const tab = activeBtn ? activeBtn.dataset.tab : "log";
+    if(tab==="log") renderLogTab();
+    if(tab==="invoices") renderInvoicesTab();
+    if(tab==="joblog") renderJobLogTab();
+    if(tab==="clients") renderClients();
+    if(tab==="settings") renderSettings();
+  }
+
+  let initialAuthHandled = false;
+  supabase.auth.onAuthStateChange(async (event, session)=>{
+    if(event==="PASSWORD_RECOVERY"){
+      applySession(session);
+      await Data.loadAll();
+      renderAuthUI();
+      showPasswordRecoveryPrompt();
+      initialAuthHandled = true;
+      return;
+    }
+    if(!initialAuthHandled) return; // first load is handled by init() below
+    applySession(session);
+    await Data.loadAll();
+    renderAuthUI();
+    renderCurrentTab();
+  });
+
+  // ---------- Tabs ----------
+  document.querySelectorAll("nav button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+      document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("tab-"+btn.dataset.tab).classList.add("active");
+      renderCurrentTab();
+    });
+  });
+
+  // ---------- Client select helpers ----------
+  function clientOptionsHtml(selectedId){
+    if(state.clients.length===0) return `<option value="">— add a client first —</option>`;
+    return state.clients.map(c=>`<option value="${c.id}" ${c.id===selectedId?"selected":""}>${escapeHtml(c.name)}</option>`).join("");
+  }
+  function refreshClientSelects(){
+    const selects = ["entryClient","filterClient","invClient","jlClient"];
+    selects.forEach(id=>{
+      const sel = document.getElementById(id);
+      const keepFirst = (id==="filterClient"||id==="jlClient") ? sel.options[0].outerHTML : "";
+      const current = sel.value;
+      sel.innerHTML = keepFirst + clientOptionsHtml(null);
+      if([...sel.options].some(o=>o.value===current)) sel.value = current;
+    });
+  }
+
+  // =========================================================
+  // TIME LOG TAB
+  // =========================================================
+  let editingEntryId = null;
+  let entryFormDate = todayStr(); // captured automatically — no date picker; entries are logged same-day
+
+  const entryForm = document.getElementById("entryForm");
+  const entryStart = document.getElementById("entryStart");
+  const entryEnd = document.getElementById("entryEnd");
+  const entryHoursPreview = document.getElementById("entryHoursPreview");
+
+  function updateEntryDateLabel(){
+    document.getElementById("entryDateLabel").textContent = `— ${fmtDateDisplay(entryFormDate)} (${dayName(entryFormDate)})`;
+  }
+  function updateHoursPreview(){
+    if(entryStart.value && entryEnd.value){
+      entryHoursPreview.textContent = fmtHours(calcHours(entryStart.value, entryEnd.value)) + " hours";
+    } else {
+      entryHoursPreview.textContent = "";
+    }
+  }
+  entryStart.addEventListener("input", updateHoursPreview);
+  entryEnd.addEventListener("input", updateHoursPreview);
+
+  entryForm.addEventListener("submit", async e=>{
+    e.preventDefault();
+    const clientId = document.getElementById("entryClient").value;
+    const date = entryFormDate;
+    const start = entryStart.value;
+    const end = entryEnd.value;
+    const category = document.getElementById("entryCategory").value;
+    const description = document.getElementById("entryDesc").value.trim();
+    if(!clientId){ alert("Add a client first (Clients tab)."); return; }
+
+    const submitBtn = document.getElementById("entrySubmitBtn");
+    submitBtn.disabled = true;
+    try{
+      if(editingEntryId){
+        await Data.updateEntry(editingEntryId, {clientId, date, startTime:start, endTime:end, category, description});
+        editingEntryId = null;
+        submitBtn.textContent = "Add Entry";
+        document.getElementById("entryCancelBtn").classList.add("hidden");
+        document.getElementById("entryFormTitle").textContent = "Add Time Entry";
+      } else {
+        await Data.createEntry({clientId, date, startTime:start, endTime:end, category, description});
+      }
+      entryForm.reset();
+      entryFormDate = todayStr();
+      updateEntryDateLabel();
+      updateHoursPreview();
+      renderLogTab();
+    } catch(err){
+      console.error(err);
+      alert("Could not save this entry: " + err.message);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  document.getElementById("entryCancelBtn").addEventListener("click", ()=>{
+    editingEntryId = null;
+    entryForm.reset();
+    entryFormDate = todayStr();
+    updateEntryDateLabel();
+    document.getElementById("entrySubmitBtn").textContent = "Add Entry";
+    document.getElementById("entryCancelBtn").classList.add("hidden");
+    document.getElementById("entryFormTitle").textContent = "Add Time Entry";
+    updateHoursPreview();
+  });
+
+  function startEditEntry(id){
+    const entry = state.entries.find(x=>x.id===id);
+    if(!entry) return;
+    if(entry.invoiceId){ alert("This entry belongs to an invoice. Delete the invoice first to edit it."); return; }
+    editingEntryId = id;
+    entryFormDate = entry.date;
+    updateEntryDateLabel();
+    document.getElementById("entryClient").value = entry.clientId;
+    entryStart.value = entry.startTime;
+    entryEnd.value = entry.endTime;
+    document.getElementById("entryCategory").value = entry.category;
+    document.getElementById("entryDesc").value = entry.description;
+    document.getElementById("entrySubmitBtn").textContent = "Update Entry";
+    document.getElementById("entryCancelBtn").classList.remove("hidden");
+    document.getElementById("entryFormTitle").textContent = "Edit Time Entry";
+    updateHoursPreview();
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  async function deleteEntry(id){
+    const entry = state.entries.find(x=>x.id===id);
+    if(!entry) return;
+    if(entry.invoiceId){ alert("This entry belongs to an invoice. Delete the invoice first."); return; }
+    if(!confirm("Delete this time entry?")) return;
+    try{
+      await Data.deleteEntry(id);
+      renderLogTab();
+    } catch(err){
+      alert("Could not delete this entry: " + err.message);
+    }
+  }
+
+  ["filterClient","filterStatus","filterFrom","filterTo"].forEach(id=>{
+    document.getElementById(id).addEventListener("change", renderEntryTable);
+  });
+
+  function filteredEntries(){
+    const clientId = document.getElementById("filterClient").value;
+    const status = document.getElementById("filterStatus").value;
+    const from = document.getElementById("filterFrom").value;
+    const to = document.getElementById("filterTo").value;
+    return state.entries.filter(e=>{
+      if(clientId && e.clientId!==clientId) return false;
+      if(status==="unbilled" && e.invoiceId) return false;
+      if(status==="billed" && !e.invoiceId) return false;
+      if(from && e.date < from) return false;
+      if(to && e.date > to) return false;
+      return true;
+    }).sort((a,b)=> a.date===b.date ? a.startTime.localeCompare(b.startTime) : b.date.localeCompare(a.date));
+  }
+
+  function renderEntryTable(){
+    const entries = filteredEntries();
+    const wrap = document.getElementById("entryTableWrap");
+    if(entries.length===0){
+      wrap.innerHTML = '<div class="empty">No time entries yet. Add one above.</div>';
+      return;
+    }
+    let rows = entries.map(e=>{
+      const client = getClient(e.clientId);
+      const hours = calcHours(e.startTime, e.endTime);
+      const billedBadge = e.invoiceId
+        ? `<span class="badge billed">Invoice ${escapeHtml(getInvoice(e.invoiceId)?.number || "?")}</span>`
+        : `<span class="badge unbilled">Unbilled</span>`;
+      const actions = e.invoiceId
+        ? `<span class="lock">🔒 locked</span>`
+        : `<button class="btn secondary sm" data-edit="${e.id}">Edit</button>
+           <button class="btn danger sm" data-del="${e.id}">Delete</button>`;
+      return `<tr>
+        <td>${fmtDateDisplay(e.date)}<br><span class="muted">${dayName(e.date)}</span></td>
+        <td>${escapeHtml(client?client.name:"—")}</td>
+        <td>${escapeHtml(e.category)}</td>
+        <td>${fmtHours(hours)}</td>
+        <td>${escapeHtml(e.description)}</td>
+        <td>${billedBadge}</td>
+        <td>${actions}</td>
+      </tr>`;
+    }).join("");
+    wrap.innerHTML = `<table>
+      <thead><tr><th>Date</th><th>Client</th><th>Category</th><th>Hours</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+    wrap.querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click",()=>startEditEntry(b.dataset.edit)));
+    wrap.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>deleteEntry(b.dataset.del)));
+  }
+
+  function renderLogSummary(){
+    const unbilled = state.entries.filter(e=>!e.invoiceId);
+    const totalHours = unbilled.reduce((s,e)=>s+calcHours(e.startTime,e.endTime),0);
+    const byClient = {};
+    unbilled.forEach(e=>{
+      const c = getClient(e.clientId);
+      if(!c) return;
+      byClient[c.id] = byClient[c.id] || {name:c.name, hours:0, amount:0, currency:c.currency};
+      const h = calcHours(e.startTime,e.endTime);
+      byClient[c.id].hours += h;
+      byClient[c.id].amount += h*(c.rate||0);
+    });
+    const cards = [`<div class="summary-card"><div class="num">${fmtHours(totalHours)}</div><div class="lbl">Unbilled Hours</div></div>`];
+    Object.values(byClient).forEach(c=>{
+      cards.push(`<div class="summary-card"><div class="num">${fmtMoney(c.amount,c.currency)}</div><div class="lbl">Owed — ${escapeHtml(c.name)}</div></div>`);
+    });
+    document.getElementById("logSummary").innerHTML = cards.join("");
+  }
+
+  function renderLogTab(){
+    refreshClientSelects();
+    renderLogSummary();
+    renderEntryTable();
+  }
+
+  // =========================================================
+  // CLIENTS TAB
+  // =========================================================
+  let editingClientId = null;
+  const clientForm = document.getElementById("clientForm");
+
+  clientForm.addEventListener("submit", async e=>{
+    e.preventDefault();
+    const data = {
+      name: document.getElementById("clName").value.trim(),
+      contactPerson: document.getElementById("clContact").value.trim(),
+      addressLines: document.getElementById("clAddress").value.split("\n").map(s=>s.trim()).filter(Boolean),
+      phone: document.getElementById("clPhone").value.trim(),
+      currency: document.getElementById("clCurrency").value.trim() || "R",
+      rate: parseFloat(document.getElementById("clRate").value) || 0
+    };
+    if(!data.name){ return; }
+    const submitBtn = document.getElementById("clientSubmitBtn");
+    submitBtn.disabled = true;
+    try{
+      if(editingClientId){
+        await Data.updateClient(editingClientId, data);
+        editingClientId = null;
+        submitBtn.textContent = "Add Client";
+        document.getElementById("clientCancelBtn").classList.add("hidden");
+        document.getElementById("clientFormTitle").textContent = "Add Client";
+      } else {
+        await Data.createClient(data);
+      }
+      clientForm.reset();
+      document.getElementById("clCurrency").value = "R";
+      renderClients();
+      refreshClientSelects();
+    } catch(err){
+      alert("Could not save this client: " + err.message);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  document.getElementById("clientCancelBtn").addEventListener("click", ()=>{
+    editingClientId = null;
+    clientForm.reset();
+    document.getElementById("clCurrency").value = "R";
+    document.getElementById("clientSubmitBtn").textContent = "Add Client";
+    document.getElementById("clientCancelBtn").classList.add("hidden");
+    document.getElementById("clientFormTitle").textContent = "Add Client";
+  });
+
+  function startEditClient(id){
+    const c = getClient(id);
+    if(!c) return;
+    editingClientId = id;
+    document.getElementById("clName").value = c.name;
+    document.getElementById("clContact").value = c.contactPerson||"";
+    document.getElementById("clAddress").value = (c.addressLines||[]).join("\n");
+    document.getElementById("clPhone").value = c.phone||"";
+    document.getElementById("clCurrency").value = c.currency||"R";
+    document.getElementById("clRate").value = c.rate||0;
+    document.getElementById("clientSubmitBtn").textContent = "Update Client";
+    document.getElementById("clientCancelBtn").classList.remove("hidden");
+    document.getElementById("clientFormTitle").textContent = "Edit Client";
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  async function deleteClient(id){
+    const inUse = state.entries.some(e=>e.clientId===id) || state.invoices.some(i=>i.clientId===id);
+    if(inUse){ alert("This client has time entries or invoices linked to them. Remove those first."); return; }
+    if(!confirm("Delete this client?")) return;
+    try{
+      await Data.deleteClient(id);
+      renderClients();
+      refreshClientSelects();
+    } catch(err){
+      alert("Could not delete this client: " + err.message);
+    }
+  }
+
+  function renderClients(){
+    const wrap = document.getElementById("clientListWrap");
+    if(state.clients.length===0){
+      wrap.innerHTML = '<div class="empty">No clients yet.</div>';
+      return;
+    }
+    wrap.innerHTML = `<table>
+      <thead><tr><th>Name</th><th>Contact</th><th>Rate</th><th>Actions</th></tr></thead>
+      <tbody>
+      ${state.clients.map(c=>`<tr>
+        <td>${escapeHtml(c.name)}<br><span class="muted">${(c.addressLines||[]).map(escapeHtml).join(", ")}</span></td>
+        <td>${escapeHtml(c.contactPerson||"—")}<br><span class="muted">${escapeHtml(c.phone||"")}</span></td>
+        <td>${fmtMoney(c.rate,c.currency)}/hr</td>
+        <td><button class="btn secondary sm" data-edit-client="${c.id}">Edit</button>
+            <button class="btn danger sm" data-del-client="${c.id}">Delete</button></td>
+      </tr>`).join("")}
+      </tbody>
+    </table>`;
+    wrap.querySelectorAll("[data-edit-client]").forEach(b=>b.addEventListener("click",()=>startEditClient(b.dataset.editClient)));
+    wrap.querySelectorAll("[data-del-client]").forEach(b=>b.addEventListener("click",()=>deleteClient(b.dataset.delClient)));
+  }
+
+  // =========================================================
+  // SETTINGS TAB
+  // =========================================================
+  function renderSettings(){
+    const s = state.sender;
+    document.getElementById("sName").value = s.name||"";
+    document.getElementById("sTagline").value = s.tagline||"";
+    document.getElementById("sAddress").value = (s.addressLines||[]).join("\n");
+    document.getElementById("sPhone").value = s.phone||"";
+    document.getElementById("sEmail").value = s.email||"";
+    document.getElementById("bBankName").value = s.bank.bankName||"";
+    document.getElementById("bBranchName").value = s.bank.branchName||"";
+    document.getElementById("bBranchCode").value = s.bank.branchCode||"";
+    document.getElementById("bAccountHolder").value = s.bank.accountHolder||"";
+    document.getElementById("bAccountNumber").value = s.bank.accountNumber||"";
+    document.getElementById("bAccountType").value = s.bank.accountType||"";
+    document.getElementById("bSwift").value = s.bank.swift||"";
+  }
+
+  document.getElementById("senderForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const sender = {
+      name: document.getElementById("sName").value.trim(),
+      tagline: document.getElementById("sTagline").value.trim(),
+      addressLines: document.getElementById("sAddress").value.split("\n").map(s=>s.trim()).filter(Boolean),
+      phone: document.getElementById("sPhone").value.trim(),
+      email: document.getElementById("sEmail").value.trim(),
+      bank: {
+        bankName: document.getElementById("bBankName").value.trim(),
+        branchName: document.getElementById("bBranchName").value.trim(),
+        branchCode: document.getElementById("bBranchCode").value.trim(),
+        accountHolder: document.getElementById("bAccountHolder").value.trim(),
+        accountNumber: document.getElementById("bAccountNumber").value.trim(),
+        accountType: document.getElementById("bAccountType").value.trim(),
+        swift: document.getElementById("bSwift").value.trim()
+      }
+    };
+    try{
+      await Data.saveSender(sender);
+      alert("Settings saved.");
+    } catch(err){
+      alert("Could not save settings: " + err.message);
+    }
+  });
+
+  // =========================================================
+  // INVOICES TAB
+  // =========================================================
+  function unbilledEntriesForClient(clientId){
+    return state.entries.filter(e=>e.clientId===clientId && !e.invoiceId)
+      .sort((a,b)=> a.date===b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date));
+  }
+
+  function renderInvEntryPicker(){
+    const clientId = document.getElementById("invClient").value;
+    const wrap = document.getElementById("invEntryPicker");
+    if(!clientId){ wrap.innerHTML = ""; updateInvTotals(); return; }
+    const entries = unbilledEntriesForClient(clientId);
+    if(entries.length===0){
+      wrap.innerHTML = '<div class="empty">No unbilled time entries for this client.</div>';
+      updateInvTotals();
+      return;
+    }
+    wrap.innerHTML = `<label>Select entries to include</label>` + entries.map(e=>{
+      const h = calcHours(e.startTime,e.endTime);
+      return `<div class="checkbox-row">
+        <input type="checkbox" class="inv-entry-cb" value="${e.id}" checked>
+        <span style="min-width:120px;">${fmtDateDisplay(e.date)}</span>
+        <span style="min-width:90px;">${fmtHours(h)} hrs</span>
+        <span class="muted">${escapeHtml(e.description)}</span>
+      </div>`;
+    }).join("");
+    wrap.querySelectorAll(".inv-entry-cb").forEach(cb=>cb.addEventListener("change", updateInvTotals));
+    updateInvTotals();
+  }
+
+  function updateInvTotals(){
+    const rate = parseFloat(document.getElementById("invRate").value) || 0;
+    const checked = [...document.querySelectorAll(".inv-entry-cb:checked")].map(cb=>cb.value);
+    const entries = state.entries.filter(e=>checked.includes(e.id));
+    const hours = entries.reduce((s,e)=>s+calcHours(e.startTime,e.endTime),0);
+    const clientId = document.getElementById("invClient").value;
+    const currency = getClient(clientId)?.currency || "R";
+    document.getElementById("invTotals").textContent =
+      entries.length ? `${fmtHours(hours)} hours × ${fmtMoney(rate,currency)}/hr = ${fmtMoney(hours*rate,currency)}` : "";
+  }
+
+  document.getElementById("invClient").addEventListener("change", ()=>{
+    const c = getClient(document.getElementById("invClient").value);
+    document.getElementById("invRate").value = c ? c.rate : "";
+    const descField = document.getElementById("invDescription");
+    if(!descField.value.trim()) descField.value = state.sender.tagline || "Software Services";
+    renderInvEntryPicker();
+  });
+  document.getElementById("invRate").addEventListener("input", updateInvTotals);
+
+  document.getElementById("generateInvoiceBtn").addEventListener("click", async ()=>{
+    const clientId = document.getElementById("invClient").value;
+    if(!clientId){ alert("Choose a client."); return; }
+    const checked = [...document.querySelectorAll(".inv-entry-cb:checked")].map(cb=>cb.value);
+    if(checked.length===0){ alert("Select at least one time entry."); return; }
+    const number = document.getElementById("invNumber").value.trim() || String(state.nextInvoiceNumber);
+    const date = document.getElementById("invDate").value || todayStr();
+    const rate = parseFloat(document.getElementById("invRate").value) || 0;
+    const description = document.getElementById("invDescription").value.trim() || state.sender.tagline || "Software Services";
+    const client = getClient(clientId);
+    const btn = document.getElementById("generateInvoiceBtn");
+    btn.disabled = true;
+    try{
+      const invoice = await Data.createInvoice({
+        clientId, number, date, rate, currency: client.currency || "R", description, entryIds: checked
+      });
+      renderInvoicesTab();
+      renderLogTab();
+      openInvoicePreview(invoice.id);
+    } catch(err){
+      alert("Could not generate this invoice: " + err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  function aggregateByDate(entries){
+    const map = new Map();
+    entries.forEach(e=>{
+      const h = calcHours(e.startTime,e.endTime);
+      if(!map.has(e.date)) map.set(e.date, {date:e.date, hours:0, descriptions:[]});
+      const row = map.get(e.date);
+      row.hours += h;
+      if(!row.descriptions.includes(e.description)) row.descriptions.push(e.description);
+    });
+    return [...map.values()].sort((a,b)=>a.date.localeCompare(b.date));
+  }
+
+  function invoiceStatusBadge(inv){
+    return inv.status==="paid" ? '<span class="badge paid">Paid</span>' : '<span class="badge unpaid">Unpaid</span>';
+  }
+
+  function renderInvoiceList(){
+    const wrap = document.getElementById("invoiceListWrap");
+    if(state.invoices.length===0){
+      wrap.innerHTML = '<div class="empty">No invoices generated yet.</div>';
+      return;
+    }
+    const rows = [...state.invoices].sort((a,b)=>b.date.localeCompare(a.date)).map(inv=>{
+      const client = getClient(inv.clientId);
+      const entries = state.entries.filter(e=>e.invoiceId===inv.id);
+      const hours = entries.reduce((s,e)=>s+calcHours(e.startTime,e.endTime),0);
+      return `<tr>
+        <td>#${escapeHtml(inv.number)}</td>
+        <td>${escapeHtml(client?client.name:"—")}</td>
+        <td>${fmtDateDisplay(inv.date)}</td>
+        <td>${fmtHours(hours)}</td>
+        <td>${fmtMoney(hours*inv.rate, inv.currency)}</td>
+        <td>${invoiceStatusBadge(inv)}</td>
+        <td>
+          <button class="btn secondary sm" data-view-inv="${inv.id}">View</button>
+          <button class="btn secondary sm" data-toggle-paid="${inv.id}">${inv.status==="paid"?"Mark Unpaid":"Mark Paid"}</button>
+          <button class="btn danger sm" data-del-inv="${inv.id}">Delete</button>
+        </td>
+      </tr>`;
+    }).join("");
+    wrap.innerHTML = `<table>
+      <thead><tr><th>#</th><th>Client</th><th>Date</th><th>Hours</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+    wrap.querySelectorAll("[data-view-inv]").forEach(b=>b.addEventListener("click",()=>openInvoicePreview(b.dataset.viewInv)));
+    wrap.querySelectorAll("[data-toggle-paid]").forEach(b=>b.addEventListener("click", async ()=>{
+      const inv = getInvoice(b.dataset.togglePaid);
+      const newStatus = inv.status==="paid" ? "unpaid" : "paid";
+      try{
+        await Data.setInvoiceStatus(inv.id, newStatus);
+        renderInvoiceList();
+      } catch(err){
+        alert("Could not update invoice status: " + err.message);
+      }
+    }));
+    wrap.querySelectorAll("[data-del-inv]").forEach(b=>b.addEventListener("click", async ()=>{
+      if(!confirm("Delete this invoice? Its time entries will become unbilled again.")) return;
+      try{
+        await Data.deleteInvoice(b.dataset.delInv);
+        renderInvoiceList();
+        renderLogTab();
+      } catch(err){
+        alert("Could not delete this invoice: " + err.message);
+      }
+    }));
+  }
+
+  function buildInvoiceDocHtml(inv){
+    const client = getClient(inv.clientId);
+    const sender = state.sender;
+    const entries = state.entries.filter(e=>e.invoiceId===inv.id);
+    const totalHours = entries.reduce((s,e)=>s+calcHours(e.startTime,e.endTime),0);
+    const bank = sender.bank;
+    const amount = totalHours*inv.rate;
+
+    // One summarized line per invoice — the day-by-day breakdown lives in the Job Log instead.
+    // Two-column layout mirrors the original spreadsheet invoice: sender + bill-to on the
+    // left running down the page, invoice title + meta + payment info on the right.
+    return `<div class="doc" id="invoiceDoc">
+      <div class="doc-columns">
+        <div class="doc-col-left">
+          <div class="doc-sender-banner">
+            <p class="doc-sender-name">${escapeHtml(sender.name)}</p>
+            <p class="doc-sender-tagline">${escapeHtml(sender.tagline)}</p>
+          </div>
+          <div class="doc-sender-addr">
+            ${(sender.addressLines||[]).map(l=>`<div>${escapeHtml(l)}</div>`).join("")}
+            <div>${escapeHtml(sender.phone||"")}</div>
+          </div>
+          <div class="doc-block-gap">
+            <p class="doc-label">Bill To</p>
+            <p>${escapeHtml(client.contactPerson||"")}</p>
+            <p>${escapeHtml(client.name)}</p>
+            ${(client.addressLines||[]).map(l=>`<p>${escapeHtml(l)}</p>`).join("")}
+            <p>${escapeHtml(client.phone||"")}</p>
+          </div>
+        </div>
+        <div class="doc-col-right">
+          <h1 class="doc-title">Invoice</h1>
+          <div class="doc-meta-block">
+            <p><span class="k">Date</span> ${fmtDateDisplay(inv.date)}</p>
+            <p><span class="k">Invoice #</span> ${escapeHtml(inv.number)}</p>
+            <p><span class="k">For</span> ${escapeHtml(inv.description || "Software Services")}</p>
+          </div>
+          <div class="doc-block-gap">
+            <p class="doc-label">Payment Info</p>
+            <p>Bank name: ${escapeHtml(bank.bankName)}</p>
+            <p>Branch name: ${escapeHtml(bank.branchName)}</p>
+            <p>Branch code: ${escapeHtml(bank.branchCode)}</p>
+            <p>Account holder: ${escapeHtml(bank.accountHolder)}</p>
+            <p>Account number: ${escapeHtml(bank.accountNumber)}</p>
+            <p>Account type: ${escapeHtml(bank.accountType)}</p>
+            <p>SWIFT code: ${escapeHtml(bank.swift)}</p>
+          </div>
+        </div>
+      </div>
+
+      <table class="doc-table">
+        <thead><tr><th>Description</th><th class="num">Hours</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>${escapeHtml(inv.description || "Software Services")}</td>
+            <td class="num">${fmtHours(totalHours)}</td>
+            <td class="num">${fmtMoney(inv.rate, inv.currency)}</td>
+            <td class="num">${fmtMoney(amount, inv.currency)}</td>
+          </tr>
+          <tr class="total-row"><td colspan="2"></td><td class="num">Total</td><td class="num">${fmtMoney(amount, inv.currency)}</td></tr>
+        </tbody>
+      </table>
+
+      <p class="doc-thanks">Thank you for your business</p>
+    </div>`;
+  }
+
+  let currentPreviewInvoiceId = null;
+  function openInvoicePreview(invId){
+    currentPreviewInvoiceId = invId;
+    const inv = getInvoice(invId);
+    document.getElementById("docPreviewWrap").innerHTML = buildInvoiceDocHtml(inv);
+    document.getElementById("invoicePreviewPanel").classList.remove("hidden");
+    document.getElementById("invoicePreviewPanel").scrollIntoView({behavior:"smooth"});
+  }
+  document.getElementById("closeInvoicePreview").addEventListener("click", ()=>{
+    document.getElementById("invoicePreviewPanel").classList.add("hidden");
+  });
+  document.getElementById("printInvoice").addEventListener("click", ()=>window.print());
+  document.getElementById("exportInvoicePdf").addEventListener("click", ()=>{
+    const inv = getInvoice(currentPreviewInvoiceId);
+    const el = document.getElementById("invoiceDoc");
+    html2pdf().set({
+      margin: 10,
+      filename: `Invoice-${inv.number}.pdf`,
+      html2canvas: {scale:2},
+      jsPDF: {unit:"mm", format:"a4", orientation:"portrait"}
+    }).from(el).save();
+  });
+
+  function renderInvoicesTab(){
+    refreshClientSelects();
+    document.getElementById("invDate").value = todayStr();
+    document.getElementById("invNumber").value = state.nextInvoiceNumber;
+    renderInvEntryPicker();
+    renderInvoiceList();
+  }
+
+  // =========================================================
+  // JOB LOG TAB
+  // =========================================================
+  document.getElementById("jlClient").addEventListener("change", populateJlInvoiceOptions);
+
+  function populateJlInvoiceOptions(){
+    const clientId = document.getElementById("jlClient").value;
+    const sel = document.getElementById("jlInvoice");
+    const relevant = state.invoices.filter(i=>!clientId || i.clientId===clientId);
+    sel.innerHTML = `<option value="">All entries</option><option value="unbilled">Unbilled only</option>` +
+      relevant.map(i=>`<option value="${i.id}">Invoice #${escapeHtml(i.number)} (${fmtDateDisplay(i.date)})</option>`).join("");
+  }
+
+  document.getElementById("generateJobLogBtn").addEventListener("click", ()=>{
+    const clientId = document.getElementById("jlClient").value;
+    const invoiceSel = document.getElementById("jlInvoice").value;
+    const from = document.getElementById("jlFrom").value;
+    const to = document.getElementById("jlTo").value;
+
+    let entries = state.entries.filter(e=>{
+      if(clientId && e.clientId!==clientId) return false;
+      if(invoiceSel==="unbilled" && e.invoiceId) return false;
+      if(invoiceSel && invoiceSel!=="unbilled" && e.invoiceId!==invoiceSel) return false;
+      if(from && e.date<from) return false;
+      if(to && e.date>to) return false;
+      return true;
+    });
+
+    if(entries.length===0){
+      alert("No entries match those filters.");
+      return;
+    }
+
+    const client = clientId ? getClient(clientId) : null;
+    const dayRows = aggregateByDate(entries);
+    const totalHours = dayRows.reduce((s,r)=>s+r.hours,0);
+
+    const rangeLabel = (from||to)
+      ? `${from?fmtDateDisplay(from):"…"} – ${to?fmtDateDisplay(to):"…"}`
+      : `${fmtDateDisplay(dayRows[0].date)} – ${fmtDateDisplay(dayRows[dayRows.length-1].date)}`;
+
+    const rows = dayRows.map(r=>`<tr>
+      <td>${fmtDateDisplay(r.date)}</td>
+      <td>${dayName(r.date)}</td>
+      <td class="num">${fmtHours(r.hours)}</td>
+      <td>${escapeHtml(r.descriptions.join("; "))}</td>
+    </tr>`).join("");
+
+    const html = `<div class="doc" id="jobLogDoc">
+      <div class="doc-header">
+        <div>
+          <div class="doc-sender-banner">
+            <p class="doc-sender-name">${escapeHtml(state.sender.name)}</p>
+            <p class="doc-sender-tagline">Job Log${client?` — ${escapeHtml(client.name)}`:""}</p>
+          </div>
+          <div class="doc-sender-addr"><div>${escapeHtml(rangeLabel)}</div></div>
+        </div>
+      </div>
+      <table class="doc-table">
+        <thead><tr><th>Date</th><th>Day</th><th class="num">Hours</th><th>Description</th></tr></thead>
+        <tbody>
+          ${rows}
+          <tr class="total-row"><td colspan="2">Total</td><td class="num">${fmtHours(totalHours)}</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>`;
+
+    document.getElementById("jobLogPreviewWrap").innerHTML = html;
+    document.getElementById("jobLogPreviewPanel").classList.remove("hidden");
+    document.getElementById("jobLogPreviewPanel").scrollIntoView({behavior:"smooth"});
+  });
+
+  document.getElementById("closeJobLogPreview").addEventListener("click", ()=>{
+    document.getElementById("jobLogPreviewPanel").classList.add("hidden");
+  });
+  document.getElementById("printJobLog").addEventListener("click", ()=>window.print());
+  document.getElementById("exportJobLogPdf").addEventListener("click", ()=>{
+    const el = document.getElementById("jobLogDoc");
+    html2pdf().set({
+      margin: 10,
+      filename: `Job-Log.pdf`,
+      html2canvas: {scale:2},
+      jsPDF: {unit:"mm", format:"a4", orientation:"portrait"}
+    }).from(el).save();
+  });
+
+  function renderJobLogTab(){
+    refreshClientSelects();
+    populateJlInvoiceOptions();
+  }
+
+  // ---------- Init ----------
+  (async function init(){
+    updateEntryDateLabel();
+    const { data:{ session } } = await supabase.auth.getSession();
+    applySession(session);
+    await Data.loadAll();
+    renderAuthUI();
+    renderLogTab();
+    initialAuthHandled = true;
+  })();
+
+</script>
+
+</body>
+</html>
