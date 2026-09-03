@@ -2,6 +2,11 @@
 .branches
 .temp
 
+# One-off data-import migrations contain real historical business data
+# (client names, task descriptions, ticket numbers) — already applied to
+# the remote DB via `supabase db push`, never meant for the public repo.
+migrations/*_import_*.sql
+
 # dotenvx
 .env.keys
 .env.local

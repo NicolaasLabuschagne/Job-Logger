@@ -183,7 +183,7 @@
     <div class="summary-bar" id="logSummary"></div>
 
     <div class="panel">
-      <h2><span id="entryFormTitle">Add Time Entry</span> <span id="entryDateLabel" class="muted" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:12px;"></span></h2>
+      <h2><span id="entryFormTitle">Add Time Entry</span> <span id="entryDateLabel" class="muted" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:12px;"></span><input type="date" id="entryDateEdit" class="hidden" style="display:inline-block;width:auto;margin-left:10px;padding:3px 8px;font-size:12px;vertical-align:middle;"></h2>
       <form id="entryForm">
         <div class="grid cols-3">
           <div class="field"><label>Client</label><select id="entryClient" required></select></div>
@@ -408,9 +408,11 @@
   function fmtHours(n){
     return (Number(n)||0).toFixed(2);
   }
+  function toLocalDateStr(d){
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
   function todayStr(){
-    const d = new Date();
-    return d.toISOString().slice(0,10);
+    return toLocalDateStr(new Date());
   }
   function dayName(dateStr){
     const d = new Date(dateStr+"T00:00:00");
@@ -448,7 +450,7 @@
     const today = new Date();
     for(let i=0;i<18;i++){
       const d = new Date(today); d.setDate(d.getDate() - (i*2 + 1));
-      const dateStr = d.toISOString().slice(0,10);
+      const dateStr = toLocalDateStr(d);
       const clientId = i%3===0 ? c2 : c1;
       const startH = 8 + (i%5), startM = (i*7)%60;
       const durMin = (1 + (i%4)*0.5)*60;
@@ -797,7 +799,7 @@
   entryForm.addEventListener("submit", async e=>{
     e.preventDefault();
     const clientId = document.getElementById("entryClient").value;
-    const date = entryFormDate;
+    const date = editingEntryId ? document.getElementById("entryDateEdit").value : entryFormDate;
     const start = entryStart.value;
     const end = entryEnd.value;
     const category = document.getElementById("entryCategory").value;
@@ -817,8 +819,7 @@
         await Data.createEntry({clientId, date, startTime:start, endTime:end, category, description});
       }
       entryForm.reset();
-      entryFormDate = todayStr();
-      updateEntryDateLabel();
+      exitDateEditMode();
       updateHoursPreview();
       renderLogTab();
     } catch(err){
@@ -829,11 +830,17 @@
     }
   });
 
+  function exitDateEditMode(){
+    entryFormDate = todayStr();
+    updateEntryDateLabel();
+    document.getElementById("entryDateLabel").classList.remove("hidden");
+    document.getElementById("entryDateEdit").classList.add("hidden");
+  }
+
   document.getElementById("entryCancelBtn").addEventListener("click", ()=>{
     editingEntryId = null;
     entryForm.reset();
-    entryFormDate = todayStr();
-    updateEntryDateLabel();
+    exitDateEditMode();
     document.getElementById("entrySubmitBtn").textContent = "Add Entry";
     document.getElementById("entryCancelBtn").classList.add("hidden");
     document.getElementById("entryFormTitle").textContent = "Add Time Entry";
@@ -845,8 +852,10 @@
     if(!entry) return;
     if(entry.invoiceId){ alert("This entry belongs to an invoice. Delete the invoice first to edit it."); return; }
     editingEntryId = id;
-    entryFormDate = entry.date;
-    updateEntryDateLabel();
+    document.getElementById("entryDateLabel").classList.add("hidden");
+    const dateEdit = document.getElementById("entryDateEdit");
+    dateEdit.classList.remove("hidden");
+    dateEdit.value = entry.date;
     document.getElementById("entryClient").value = entry.clientId;
     entryStart.value = entry.startTime;
     entryEnd.value = entry.endTime;
