@@ -1,0 +1,6 @@
+# Real business/financial records — invoices and the original timesheet.
+# These contain real client, banking, and historical work data and have
+# no reason to be in this public repo now that the app replaces them.
+*.pdf
+*.xlsx
+*.xls
