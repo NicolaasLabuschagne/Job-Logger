@@ -47,6 +47,13 @@
   nav button{background:none;border:none;border-bottom:2px solid transparent;padding:12px 12px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);transition:all .15s;}
   nav button:hover{color:var(--text);}
   nav button.active{color:var(--text);border-bottom-color:var(--text);text-shadow:0 0 6px rgba(205,245,255,.5);}
+  @media(max-width:640px){
+    header{gap:6px;}
+    header h1{padding:8px 12px;font-size:15px;}
+    nav{padding:0 4px;}
+    nav button{padding:8px 7px;font-size:10px;}
+    .auth-area{margin-left:0;width:100%;justify-content:flex-end;padding:6px 12px 10px;}
+  }
   main{max-width:1180px;margin:0 auto;padding:26px 20px 60px;}
   .tab{display:none;}
   .tab.active{display:block;}
@@ -121,7 +128,9 @@
      Deliberately separate from the app's brutalist chrome above — these are
      client-facing paperwork, styled after the original spreadsheet invoice
      (Rockwell Nova + Century Gothic, charcoal header row, cream row stripes). */
-  #docPreviewWrap{margin-top:10px;}
+  #docPreviewWrap, #jobLogPreviewWrap{margin-top:10px;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -2px;}
+  .table-scroll table{min-width:640px;}
   .doc{
     --doc-ink:#26241f; --doc-muted:#8a8578; --doc-line:#e6e1d3; --doc-cream:#f7f3e8; --doc-dark:#26241f;
     background:#fffefb;padding:52px 56px;border:1px solid var(--doc-line);border-radius:6px;
@@ -148,6 +157,12 @@
   table.doc-table .num{text-align:right;}
   table.doc-table tr.total-row td{font-family:'Roboto Slab',serif;font-weight:700;font-size:14px;border-top:none;border-bottom:none;background:var(--doc-dark)!important;color:var(--doc-cream);padding-top:13px;padding-bottom:13px;}
   .doc-thanks{margin-top:34px;padding-top:18px;border-top:1px solid var(--doc-line);text-align:center;color:var(--doc-muted);font-size:11px;text-transform:uppercase;letter-spacing:.1em;}
+  @media (max-width:640px){
+    .doc{padding:26px 18px;font-size:12px;min-width:520px;}
+    .doc-columns{grid-template-columns:1fr;gap:22px;}
+    .doc h1.doc-title{text-align:left;margin-top:14px;font-size:24px;}
+    table.doc-table th,table.doc-table td{padding:8px 8px;}
+  }
   @media print{
     header,nav,.demo-banner,.no-print{display:none!important;}
     body{background:#fff;}
@@ -221,7 +236,7 @@
         <div class="field"><label>From</label><input type="date" id="filterFrom"></div>
         <div class="field"><label>To</label><input type="date" id="filterTo"></div>
       </div>
-      <div id="entryTableWrap"></div>
+      <div id="entryTableWrap" class="table-scroll"></div>
     </div>
   </div>
 
@@ -249,7 +264,7 @@
 
     <div class="panel">
       <h2>Past Invoices</h2>
-      <div id="invoiceListWrap"></div>
+      <div id="invoiceListWrap" class="table-scroll"></div>
     </div>
 
     <div class="panel hidden" id="invoicePreviewPanel">
@@ -312,7 +327,7 @@
     </div>
     <div class="panel">
       <h2>Clients</h2>
-      <div id="clientListWrap"></div>
+      <div id="clientListWrap" class="table-scroll"></div>
     </div>
   </div>
 
