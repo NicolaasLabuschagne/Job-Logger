@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600;700&family=Roboto+Slab:wght@400;500;700&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.14.0/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
 <style>
   :root{
     --bg:#04070a;
@@ -103,6 +104,12 @@
   .summary-card:nth-child(3n) .num{color:var(--amber);}
   .summary-card .lbl{font-size:10.5px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
   .empty{color:var(--muted);font-size:13px;padding:16px 0;text-align:center;}
+  .chart-wrap{position:relative;height:260px;}
+  @media(max-width:700px){.chart-wrap{height:220px;}}
+  .chart-controls{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+  .chart-controls select{width:auto;padding:5px 9px;font-size:10.5px;}
+  .chart-type-toggle{display:flex;gap:6px;}
+  .chart-type-btn.active{background:var(--text);color:#03080a;}
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
   .toolbar .field{min-width:150px;flex:1;}
   .checkbox-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border-dim);}
@@ -180,6 +187,7 @@
     <button data-tab="log" class="active">Time Log</button>
     <button data-tab="invoices">Invoices</button>
     <button data-tab="joblog">Job Log</button>
+    <button data-tab="stats">Stats</button>
     <button data-tab="clients">Clients</button>
     <button data-tab="settings">Settings</button>
   </nav>
@@ -302,6 +310,81 @@
     </div>
   </div>
 
+  <!-- STATS TAB -->
+  <div class="tab" id="tab-stats">
+    <div class="summary-bar" id="statsSummary"></div>
+    <div class="empty hidden" id="statsEmpty">No time entries yet — log some hours to see stats here.</div>
+    <div id="statsChartsWrap">
+      <div class="grid cols-2">
+        <div class="panel">
+          <h2>Hours by Client</h2>
+          <div class="chart-controls">
+            <select class="chart-range-select" data-chart="hoursByClient">
+              <option value="28">Last 4 Weeks</option>
+              <option value="84">Last 12 Weeks</option>
+              <option value="182">Last 6 Months</option>
+              <option value="365">Last 12 Months</option>
+              <option value="lifetime">Lifetime</option>
+            </select>
+            <div class="chart-type-toggle" data-chart="hoursByClient">
+              <button type="button" class="btn sm chart-type-btn" data-type="bar">Column</button>
+              <button type="button" class="btn sm chart-type-btn" data-type="line">Line</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="chartHoursByClient"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2>Hours by Category</h2>
+          <div class="chart-controls">
+            <select class="chart-range-select" data-chart="hoursByCategory">
+              <option value="28">Last 4 Weeks</option>
+              <option value="84">Last 12 Weeks</option>
+              <option value="182">Last 6 Months</option>
+              <option value="365">Last 12 Months</option>
+              <option value="lifetime">Lifetime</option>
+            </select>
+          </div>
+          <div class="chart-wrap"><canvas id="chartHoursByCategory"></canvas></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Weekly Hours</h2>
+        <div class="chart-controls">
+          <select class="chart-range-select" data-chart="weeklyHours">
+            <option value="8">Last 8 Weeks</option>
+            <option value="12">Last 12 Weeks</option>
+            <option value="26">Last 26 Weeks</option>
+            <option value="52">Last 52 Weeks</option>
+            <option value="lifetime">Lifetime</option>
+          </select>
+          <div class="chart-type-toggle" data-chart="weeklyHours">
+            <button type="button" class="btn sm chart-type-btn" data-type="bar">Column</button>
+            <button type="button" class="btn sm chart-type-btn" data-type="line">Line</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartWeeklyHours"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2>Invoiced Amount by Month</h2>
+        <div class="chart-controls">
+          <select class="chart-range-select" data-chart="monthlyEarnings">
+            <option value="3">Last 3 Months</option>
+            <option value="6">Last 6 Months</option>
+            <option value="12">Last 12 Months</option>
+            <option value="24">Last 24 Months</option>
+            <option value="lifetime">Lifetime</option>
+          </select>
+          <div class="chart-type-toggle" data-chart="monthlyEarnings">
+            <button type="button" class="btn sm chart-type-btn" data-type="bar">Column</button>
+            <button type="button" class="btn sm chart-type-btn" data-type="line">Line</button>
+          </div>
+        </div>
+        <div class="muted" id="monthlyEarningsNote" style="font-size:11.5px;margin-bottom:8px;"></div>
+        <div class="chart-wrap"><canvas id="chartMonthlyEarnings"></canvas></div>
+      </div>
+    </div>
+  </div>
+
   <!-- CLIENTS TAB -->
   <div class="tab" id="tab-clients">
     <div class="panel">
@@ -405,6 +488,13 @@
   const SUPABASE_URL = "https://vlwuhplkctevwoaicrcb.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZsd3VocGxrY3RldndvYWljcmNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzOTQyOTIsImV4cCI6MjEwMzk3MDI5Mn0.TIs5xIdgiIr1_ihl0BubSV7q4ZEEplrivs9NxQPGnQQ";
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  if(window.Chart){
+    Chart.defaults.color = "#6d8b8f";
+    Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+    Chart.defaults.font.size = 11;
+    Chart.defaults.borderColor = "rgba(206,247,255,.08)";
+  }
 
   let mode = "demo"; // "demo" | "live" — demo never touches Supabase data tables
   let currentUser = null;
@@ -739,6 +829,7 @@
     if(tab==="log") renderLogTab();
     if(tab==="invoices") renderInvoicesTab();
     if(tab==="joblog") renderJobLogTab();
+    if(tab==="stats") renderStatsTab();
     if(tab==="clients") renderClients();
     if(tab==="settings") renderSettings();
   }
@@ -1451,6 +1542,333 @@
   function renderJobLogTab(){
     refreshClientSelects();
     populateJlInvoiceOptions();
+  }
+
+  // =========================================================
+  // STATS TAB
+  // =========================================================
+  const statsCharts = {};
+  function renderChart(id, config){
+    const canvas = document.getElementById(id);
+    if(!canvas) return;
+    if(statsCharts[id]) statsCharts[id].destroy();
+    statsCharts[id] = new Chart(canvas.getContext("2d"), config);
+  }
+
+  // ---- Column/Line toggle per chart (preference remembered per browser) ----
+  const chartTypePrefs = {};
+  ["hoursByClient","weeklyHours","monthlyEarnings"].forEach(key=>{
+    let saved = null;
+    try{ saved = localStorage.getItem("statsChartType:"+key); }catch(err){}
+    chartTypePrefs[key] = (saved==="line" || saved==="bar") ? saved : "bar";
+  });
+
+  function syncChartTypeToggles(){
+    document.querySelectorAll(".chart-type-toggle").forEach(group=>{
+      const key = group.dataset.chart;
+      group.querySelectorAll(".chart-type-btn").forEach(btn=>{
+        btn.classList.toggle("active", btn.dataset.type === chartTypePrefs[key]);
+      });
+    });
+  }
+
+  function setChartType(key, type){
+    chartTypePrefs[key] = type;
+    try{ localStorage.setItem("statsChartType:"+key, type); }catch(err){}
+    syncChartTypeToggles();
+    renderStatsTab();
+  }
+
+  document.querySelectorAll(".chart-type-toggle").forEach(group=>{
+    const key = group.dataset.chart;
+    group.querySelectorAll(".chart-type-btn").forEach(btn=>{
+      btn.addEventListener("click", ()=>setChartType(key, btn.dataset.type));
+    });
+  });
+
+  function datasetVisualForType(type, color){
+    if(type==="line"){
+      return { borderColor:color, backgroundColor:color+"33", fill:true, tension:.35, pointRadius:3, pointBackgroundColor:color, pointBorderColor:color, borderWidth:2 };
+    }
+    return { backgroundColor:color, borderRadius:3, maxBarThickness:28 };
+  }
+
+  // ---- Time-range picker per chart (preference remembered per browser; "lifetime" = no cutoff) ----
+  const CHART_RANGE_DEFAULTS = { hoursByClient:"lifetime", hoursByCategory:"lifetime", weeklyHours:"12", monthlyEarnings:"6" };
+  const chartRangePrefs = {};
+  Object.keys(CHART_RANGE_DEFAULTS).forEach(key=>{
+    let saved = null;
+    try{ saved = localStorage.getItem("statsChartRange:"+key); }catch(err){}
+    chartRangePrefs[key] = saved || CHART_RANGE_DEFAULTS[key];
+  });
+
+  function syncChartRangeSelects(){
+    document.querySelectorAll(".chart-range-select").forEach(sel=>{
+      sel.value = chartRangePrefs[sel.dataset.chart];
+    });
+  }
+
+  document.querySelectorAll(".chart-range-select").forEach(sel=>{
+    sel.addEventListener("change", ()=>{
+      const key = sel.dataset.chart;
+      chartRangePrefs[key] = sel.value;
+      try{ localStorage.setItem("statsChartRange:"+key, sel.value); }catch(err){}
+      renderStatsTab();
+    });
+  });
+
+  function rangeCutoffDate(rangeValue){
+    if(rangeValue==="lifetime") return null;
+    const d = new Date();
+    d.setDate(d.getDate() - parseInt(rangeValue,10));
+    d.setHours(0,0,0,0);
+    return d;
+  }
+
+  function filterEntriesByRange(rangeValue){
+    const cutoff = rangeCutoffDate(rangeValue);
+    if(!cutoff) return state.entries;
+    return state.entries.filter(e => new Date(e.date+"T00:00:00") >= cutoff);
+  }
+
+  function mondayOf(d){
+    const day = (d.getDay()+6)%7;
+    const m = new Date(d);
+    m.setDate(d.getDate()-day);
+    m.setHours(0,0,0,0);
+    return m;
+  }
+
+  function computeHoursByClient(entries){
+    const map = new Map();
+    entries.forEach(e=>{
+      const c = getClient(e.clientId);
+      if(!c) return;
+      map.set(c.id, (map.get(c.id)||0) + calcHours(e.startTime, e.endTime));
+    });
+    return [...map.entries()]
+      .map(([id,hours])=>({name:getClient(id).name, hours}))
+      .sort((a,b)=>b.hours-a.hours);
+  }
+
+  function computeHoursByCategory(entries){
+    const cats = ["Coding","Meeting","Other"];
+    const totals = {Coding:0, Meeting:0, Other:0};
+    entries.forEach(e=>{
+      const h = calcHours(e.startTime, e.endTime);
+      if(totals[e.category]!=null) totals[e.category] += h;
+      else totals.Other += h;
+    });
+    return cats.map(name=>({name, hours:totals[name]}));
+  }
+
+  function computeWeeklyHours(rangeValue){
+    const thisMonday = mondayOf(new Date());
+    let weeks;
+    if(rangeValue==="lifetime"){
+      if(state.entries.length===0){ weeks = 1; }
+      else {
+        const earliest = state.entries.reduce((min,e)=> e.date<min?e.date:min, state.entries[0].date);
+        const earliestMonday = mondayOf(new Date(earliest+"T00:00:00"));
+        weeks = Math.round((thisMonday-earliestMonday)/(7*24*60*60*1000)) + 1;
+      }
+    } else {
+      weeks = parseInt(rangeValue,10);
+    }
+    const buckets = [];
+    for(let i=weeks-1;i>=0;i--){
+      const start = new Date(thisMonday); start.setDate(thisMonday.getDate()-i*7);
+      buckets.push({start, hours:0});
+    }
+    state.entries.forEach(e=>{
+      const wk = mondayOf(new Date(e.date+"T00:00:00"));
+      const b = buckets.find(x=>x.start.getTime()===wk.getTime());
+      if(b) b.hours += calcHours(e.startTime, e.endTime);
+    });
+    return buckets.map(b=>({label:b.start.toLocaleDateString(undefined,{month:"short",day:"numeric"}), hours:b.hours}));
+  }
+
+  function dominantInvoiceCurrency(){
+    const counts = {};
+    state.invoices.forEach(inv=>{ const c = inv.currency||"R"; counts[c] = (counts[c]||0)+1; });
+    let best = "R", bestCount = -1;
+    Object.entries(counts).forEach(([cur,cnt])=>{ if(cnt>bestCount){ best=cur; bestCount=cnt; } });
+    return best;
+  }
+
+  // Which month an invoice "belongs to" for charting: the month most of its billed
+  // work actually happened in — not the (often later) date the invoice was generated.
+  // Falls back to the invoice's own date if its entries were since deleted.
+  function invoicePeriodMonthKey(inv){
+    const entries = state.entries.filter(e=>e.invoiceId===inv.id);
+    if(entries.length===0) return inv.date.slice(0,7);
+    const counts = new Map();
+    entries.forEach(e=>{
+      const key = e.date.slice(0,7);
+      counts.set(key, (counts.get(key)||0)+1);
+    });
+    let bestKey = null, bestCount = -1;
+    [...counts.keys()].sort().forEach(key=>{
+      const c = counts.get(key);
+      if(c > bestCount){ bestCount = c; bestKey = key; }
+    });
+    return bestKey;
+  }
+
+  function computeMonthlyEarnings(rangeValue){
+    const currency = dominantInvoiceCurrency();
+    const now = new Date();
+    const periodKeys = state.invoices.map(inv=>invoicePeriodMonthKey(inv));
+    let months;
+    if(rangeValue==="lifetime"){
+      if(periodKeys.length===0){ months = 1; }
+      else {
+        const earliest = periodKeys.reduce((min,k)=> k<min?k:min, periodKeys[0]);
+        const ed = new Date(earliest+"-01T00:00:00");
+        months = (now.getFullYear()-ed.getFullYear())*12 + (now.getMonth()-ed.getMonth()) + 1;
+      }
+    } else {
+      months = parseInt(rangeValue,10);
+    }
+    const buckets = [];
+    for(let i=months-1;i>=0;i--){
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      buckets.push({key:`${d.getFullYear()}-${d.getMonth()}`, label:d.toLocaleDateString(undefined,{month:"short",year:"numeric"}), paid:0, unpaid:0});
+    }
+    let otherCurrencyCount = 0;
+    state.invoices.forEach((inv,idx)=>{
+      if((inv.currency||"R") !== currency){ otherCurrencyCount++; return; }
+      const d = new Date(periodKeys[idx]+"-01T00:00:00");
+      const b = buckets.find(x=>x.key===`${d.getFullYear()}-${d.getMonth()}`);
+      if(!b) return;
+      const hrs = state.entries.filter(e=>e.invoiceId===inv.id).reduce((s,e)=>s+calcHours(e.startTime,e.endTime),0);
+      const amount = hrs*inv.rate;
+      if(inv.status==="paid") b.paid += amount; else b.unpaid += amount;
+    });
+    return {currency, buckets, otherCurrencyCount};
+  }
+
+  function renderStatsSummary(){
+    const totalHours = state.entries.reduce((s,e)=>s+calcHours(e.startTime,e.endTime),0);
+    const unbilledHours = state.entries.filter(e=>!e.invoiceId).reduce((s,e)=>s+calcHours(e.startTime,e.endTime),0);
+    const byCurrency = new Map();
+    state.invoices.forEach(inv=>{
+      const cur = inv.currency || "R";
+      if(!byCurrency.has(cur)) byCurrency.set(cur, {paid:0, outstanding:0});
+      const hrs = state.entries.filter(e=>e.invoiceId===inv.id).reduce((s,e)=>s+calcHours(e.startTime,e.endTime),0);
+      const amount = hrs*inv.rate;
+      const bucket = byCurrency.get(cur);
+      if(inv.status==="paid") bucket.paid += amount; else bucket.outstanding += amount;
+    });
+    const cards = [
+      `<div class="summary-card"><div class="num">${fmtHours(totalHours)}</div><div class="lbl">Total Hours Logged</div></div>`,
+      `<div class="summary-card"><div class="num">${fmtHours(unbilledHours)}</div><div class="lbl">Unbilled Hours</div></div>`
+    ];
+    const multi = byCurrency.size>1;
+    byCurrency.forEach((v,cur)=>{
+      cards.push(`<div class="summary-card"><div class="num">${fmtMoney(v.paid,cur)}</div><div class="lbl">Paid${multi?" ("+escapeHtml(cur)+")":""}</div></div>`);
+      cards.push(`<div class="summary-card"><div class="num">${fmtMoney(v.outstanding,cur)}</div><div class="lbl">Outstanding${multi?" ("+escapeHtml(cur)+")":""}</div></div>`);
+    });
+    document.getElementById("statsSummary").innerHTML = cards.join("");
+  }
+
+  function renderStatsTab(){
+    renderStatsSummary();
+    syncChartTypeToggles();
+    syncChartRangeSelects();
+
+    const hasData = state.entries.length>0;
+    document.getElementById("statsChartsWrap").classList.toggle("hidden", !hasData);
+    document.getElementById("statsEmpty").classList.toggle("hidden", hasData);
+    if(!hasData) return;
+
+    const byClient = computeHoursByClient(filterEntriesByRange(chartRangePrefs.hoursByClient));
+    const hbcType = chartTypePrefs.hoursByClient;
+    renderChart("chartHoursByClient", {
+      type: hbcType,
+      data:{
+        labels: byClient.map(c=>c.name),
+        datasets:[{ data: byClient.map(c=>c.hours), ...datasetVisualForType(hbcType, "#3987e5") }]
+      },
+      options:{
+        indexAxis:"y", responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{backgroundColor:"#0d1517", borderColor:"rgba(206,247,255,.3)", borderWidth:1, titleColor:"#cdf5ff", bodyColor:"#cdf5ff", callbacks:{label:ctx=>fmtHours(ctx.parsed.x)+" hrs"}}
+        },
+        scales:{
+          x:{ beginAtZero:true, grid:{color:"rgba(206,247,255,.08)"} },
+          y:{ grid:{display:false} }
+        }
+      }
+    });
+
+    const byCategory = computeHoursByCategory(filterEntriesByRange(chartRangePrefs.hoursByCategory));
+    renderChart("chartHoursByCategory", {
+      type:"doughnut",
+      data:{
+        labels: byCategory.map(c=>c.name),
+        datasets:[{ data: byCategory.map(c=>c.hours), backgroundColor:["#3987e5","#d95926","#199e70"], borderColor:"#070c0d", borderWidth:2 }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ position:"bottom", labels:{ boxWidth:12, padding:14, color:"#cdf5ff" } },
+          tooltip:{backgroundColor:"#0d1517", borderColor:"rgba(206,247,255,.3)", borderWidth:1, titleColor:"#cdf5ff", bodyColor:"#cdf5ff", callbacks:{ label:ctx=>` ${ctx.label}: ${fmtHours(ctx.parsed)} hrs` }}
+        }
+      }
+    });
+
+    const weekly = computeWeeklyHours(chartRangePrefs.weeklyHours);
+    const whType = chartTypePrefs.weeklyHours;
+    renderChart("chartWeeklyHours", {
+      type: whType,
+      data:{
+        labels: weekly.map(w=>w.label),
+        datasets:[{ data: weekly.map(w=>w.hours), ...datasetVisualForType(whType, "#3987e5") }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{backgroundColor:"#0d1517", borderColor:"rgba(206,247,255,.3)", borderWidth:1, titleColor:"#cdf5ff", bodyColor:"#cdf5ff", callbacks:{label:ctx=>fmtHours(ctx.parsed.y)+" hrs"}}
+        },
+        scales:{
+          x:{ grid:{display:false} },
+          y:{ beginAtZero:true, grid:{color:"rgba(206,247,255,.08)"} }
+        }
+      }
+    });
+
+    const { currency, buckets, otherCurrencyCount } = computeMonthlyEarnings(chartRangePrefs.monthlyEarnings);
+    document.getElementById("monthlyEarningsNote").textContent = otherCurrencyCount>0
+      ? `Showing ${currency} invoices only — ${otherCurrencyCount} invoice(s) in other currencies not included.`
+      : "";
+    const meType = chartTypePrefs.monthlyEarnings;
+    const paidVisual = datasetVisualForType(meType, "#8fe3a6");
+    const unpaidVisual = datasetVisualForType(meType, "#e0716a");
+    if(meType==="bar"){ paidVisual.stack = "s"; unpaidVisual.stack = "s"; }
+    renderChart("chartMonthlyEarnings", {
+      type: meType,
+      data:{
+        labels: buckets.map(b=>b.label),
+        datasets:[
+          { label:"Paid", data: buckets.map(b=>b.paid), ...paidVisual },
+          { label:"Unpaid", data: buckets.map(b=>b.unpaid), ...unpaidVisual }
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ position:"bottom", labels:{ boxWidth:12, padding:14, color:"#cdf5ff" } },
+          tooltip:{backgroundColor:"#0d1517", borderColor:"rgba(206,247,255,.3)", borderWidth:1, titleColor:"#cdf5ff", bodyColor:"#cdf5ff", callbacks:{ label:ctx=>` ${ctx.dataset.label}: ${fmtMoney(ctx.parsed.y, currency)}` }}
+        },
+        scales:{
+          x:{ stacked: meType==="bar", grid:{display:false} },
+          y:{ stacked: meType==="bar", beginAtZero:true, grid:{color:"rgba(206,247,255,.08)"}, ticks:{callback:v=>fmtMoney(v,currency)} }
+        }
+      }
+    });
   }
 
   // ---------- Init ----------
