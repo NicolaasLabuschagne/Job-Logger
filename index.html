@@ -485,8 +485,10 @@
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-  const SUPABASE_URL = "https://vlwuhplkctevwoaicrcb.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZsd3VocGxrY3RldndvYWljcmNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzOTQyOTIsImV4cCI6MjEwMzk3MDI5Mn0.TIs5xIdgiIr1_ihl0BubSV7q4ZEEplrivs9NxQPGnQQ";
+  // Injected at deploy time by .github/workflows/deploy.yml from repo Secrets.
+  // Locally these placeholders are harmless no-ops — see README for how to test against a real project.
+  const SUPABASE_URL = "__SUPABASE_URL__";
+  const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   if(window.Chart){
