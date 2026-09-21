@@ -8,6 +8,8 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
     steps:
       - name: Ping Supabase REST API
         env:
