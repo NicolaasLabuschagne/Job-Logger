@@ -1005,7 +1005,7 @@
       if(from && e.date < from) return false;
       if(to && e.date > to) return false;
       return true;
-    }).sort((a,b)=> a.date===b.date ? a.startTime.localeCompare(b.startTime) : b.date.localeCompare(a.date));
+    }).sort((a,b)=> a.date===b.date ? b.startTime.localeCompare(a.startTime) : b.date.localeCompare(a.date));
   }
 
   function renderEntryTable(){
