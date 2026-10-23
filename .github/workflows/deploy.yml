@@ -29,6 +29,10 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
+          # Strip stray whitespace/newlines (e.g. from pasting into the secret box) and any trailing slash
+          SUPABASE_URL="$(printf '%s' "$SUPABASE_URL" | tr -d '[:space:]')"
+          SUPABASE_URL="${SUPABASE_URL%/}"
+          SUPABASE_ANON_KEY="$(printf '%s' "$SUPABASE_ANON_KEY" | tr -d '[:space:]')"
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
             echo "::error::SUPABASE_URL or SUPABASE_ANON_KEY repo secret is not set."
             exit 1
